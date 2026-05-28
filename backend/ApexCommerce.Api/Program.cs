@@ -1,20 +1,32 @@
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// 1. Configure Services (Dependency Injection Container)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173") // Your React app's local development port
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// 2. Configure the HTTP Request Pipeline (Middleware Assembly Line)
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// CRITICAL: CORS must run first thing in the pipeline to authorize cross-origin browser headers
+app.UseCors("AllowReactApp");
+
+// Commented out to prevent the local port redirection warnings we saw earlier
+// app.UseHttpsRedirection(); 
 
 app.UseAuthorization();
 
