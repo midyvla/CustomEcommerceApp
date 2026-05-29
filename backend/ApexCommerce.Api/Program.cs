@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore; // <-- Confirm this is at line 1!
+using ApexCommerce.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddScoped<IPaymentGatewayService, MockPaymentGatewayService>();
 
 // 1. Configure Services (Dependency Injection Container)
 builder.Services.AddCors(options =>

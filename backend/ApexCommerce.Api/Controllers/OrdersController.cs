@@ -34,28 +34,36 @@ namespace ApexCommerce.Api.Controllers
         public async Task<IActionResult> UpdateOrderStatus(int id, [FromBody] StatusUpdateDto dto)
         {
             if (dto == null || string.IsNullOrWhiteSpace(dto.Status))
-            {
                 return BadRequest(new { error = "An explicit lifecycle status state must be provided." });
-            }
-
-            // Validate that the requested status conforms to system boundaries
-            var validStatuses = new[] { "Pending", "Shipped", "Completed" };
-            if (!validStatuses.Contains(dto.Status))
-            {
-                return BadRequest(new { error = $"Status value '{dto.Status}' is invalid." });
-            }
 
             var order = await _context.Orders.FindAsync(id);
             if (order == null)
-            {
                 return NotFound(new { error = $"Order ID {id} does not exist inside system logs." });
+
+            // --- STRATEGIC BUSINESS WORKFLOW TRANSITION RULES ---
+            string current = order.OrderStatus;
+            string target = dto.Status;
+
+            if (current == target) return Ok(new { success = true, message = "Status remains unchanged." });
+
+            // Prevent bypassing business steps or illegal backwards state degradation updates
+            bool isValidTransition = (current == "Pending" && target == "Shipped") ||
+                                     (current == "Shipped" && target == "Completed") ||
+                                     (current == "Pending" && target == "Completed"); // Express bypass route Allowed
+
+            if (!isValidTransition)
+            {
+                return BadRequest(new
+                {
+                    error = $"Invalid workflow transition. Cannot move order status directly from '{current}' to '{target}'."
+                });
             }
 
-            // Apply the update
-            order.OrderStatus = dto.Status;
+            // Apply the verified status modification safely
+            order.OrderStatus = target;
             await _context.SaveChangesAsync();
 
-            return Ok(new { success = true, message = $"Order status advanced to '{dto.Status}' successfully." });
+            return Ok(new { success = true, message = $"Order updated from '{current}' to '{target}'." });
         }
 
         // Inline request body helper definition contract

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ApexCommerce.Api.Data;
 using ApexCommerce.Api.Models;
 using ApexCommerce.Api.DTOs;
+using ApexCommerce.Api.Services; // Ensure your services namespace is included
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,118 +11,128 @@ using System.Threading.Tasks;
 
 namespace ApexCommerce.Api.Controllers
 {
-	[ApiController]
-	[Route("api/[controller]")]
-	public class CheckoutController : ControllerBase
-	{
-		private readonly AppDbContext _context;
+    [ApiController]
+    [Route("api/[controller]")]
+    public class CheckoutController : ControllerBase
+    {
+        private readonly AppDbContext _context;
+        private readonly IPaymentGatewayService _paymentService;
 
-		public CheckoutController(AppDbContext context)
-		{
-			_context = context;
-		}
+        // One single unified constructor injecting both infrastructure dependencies
+        public CheckoutController(AppDbContext context, IPaymentGatewayService paymentService)
+        {
+            _context = context;
+            _paymentService = paymentService;
+        }
 
-		[HttpPost]
-		public async Task<IActionResult> ProcessCheckout([FromBody] CheckoutRequestDto request)
-		{
-			if (!ModelState.IsValid)
-			{
-				return BadRequest(ModelState);
-			}
+        [HttpPost]
+        public async Task<IActionResult> ProcessCheckout([FromBody] CheckoutRequestDto request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
 
-			// 1. Open a clean execution transaction boundary across our Docker SQL instance
-			using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // 1. Calculate base items pricing layout dynamically first to establish our financial totals
+                decimal basePrice = 49.99m;
+                var lineItemsToPersist = new List<OrderItem>();
 
-			try
-			{
-				// 2. Hydrate and validate the primary product entity
-				// Note: Utilizing raw SQL compatibility tables or EF tables depending on context
-				// For safety in this endpoint, we'll fetch prices dynamically to protect against client-side tampering.
+                lineItemsToPersist.Add(new OrderItem
+                {
+                    ProductId = request.BaseProductId,
+                    ProductName = "3D Electric Smart Scalp Massager",
+                    UnitPrice = basePrice,
+                    Quantity = 1,
+                    IsAddon = false
+                });
 
-				// Let's create a temporary mock lookup validation to calculate baseline financial metrics safely
-				// In production, you will fetch these fields straight from your database tracking tables
-				decimal basePrice = 49.99m;
-				var lineItemsToPersist = new List<OrderItem>();
+                decimal subtotal = basePrice;
 
-				// Add the main massager line item configuration
-				lineItemsToPersist.Add(new OrderItem
-				{
-					ProductId = request.BaseProductId,
-					ProductName = "3D Electric Smart Scalp Massager",
-					UnitPrice = basePrice,
-					Quantity = 1,
-					IsAddon = false
-				});
+                // Process companion bundle addons if checked
+                if (request.SelectedAddonProductIds != null && request.SelectedAddonProductIds.Any())
+                {
+                    foreach (var addonId in request.SelectedAddonProductIds)
+                    {
+                        decimal addonPrice = 0m;
+                        string addonName = "";
 
-				decimal subtotal = basePrice;
+                        if (addonId == 2) { addonPrice = 19.99m; addonName = "Organic Rosemary & Biotin Growth Serum"; }
+                        else if (addonId == 3) { addonPrice = 16.14m; addonName = "Premium Jojoba Detoxifying Scalp Oil"; }
+                        else { return BadRequest(new { error = $"Requested addon item ID {addonId} is invalid or out of stock." }); }
 
-				// 3. Process companion bundle addons if checked
-				if (request.SelectedAddonProductIds != null && request.SelectedAddonProductIds.Any())
-				{
-					foreach (var addonId in request.SelectedAddonProductIds)
-					{
-						decimal addonPrice = 0m;
-						string addonName = "";
+                        subtotal += addonPrice;
+                        lineItemsToPersist.Add(new OrderItem
+                        {
+                            ProductId = addonId,
+                            ProductName = addonName,
+                            UnitPrice = addonPrice,
+                            Quantity = 1,
+                            IsAddon = true
+                        });
+                    }
+                }
 
-						if (addonId == 2) { addonPrice = 19.99m; addonName = "Organic Rosemary & Biotin Growth Serum"; }
-						else if (addonId == 3) { addonPrice = 16.14m; addonName = "Premium Jojoba Detoxifying Scalp Oil"; }
-						else { return BadRequest(new { error = $"Requested addon item ID {addonId} is invalid or out of stock." }); }
+                // Calculate total pricing baseline metrics
+                decimal tax = Math.Round(subtotal * 0.0625m, 2); // 6.25% Massachusetts rate
+                decimal shipping = subtotal >= 75.00m ? 0.00m : 5.99m;
+                decimal total = subtotal + tax + shipping;
 
-						subtotal += addonPrice;
-						lineItemsToPersist.Add(new OrderItem
-						{
-							ProductId = addonId,
-							ProductName = addonName,
-							UnitPrice = addonPrice,
-							Quantity = 1,
-							IsAddon = true
-						});
-					}
-				}
+                // 2. DISPATCH PAYMENT GATEWAY AUTH LOOP
+                // We run this BEFORE creating database records to protect stock tables from failed payments
+                var paymentResult = await _paymentService.ProcessAuthorizationAsync(request.CustomerEmail, total);
+                if (!paymentResult.IsSuccess)
+                {
+                    return BadRequest(new { error = paymentResult.ErrorMessage });
+                }
 
-				// 4. Calculate fixed financial rates
-				decimal tax = Math.Round(subtotal * 0.0625m, 2); // Standard Massachusetts tax bounds (6.25%)
-				decimal shipping = subtotal >= 75.00m ? 0.00m : 5.99m; // Free shipping threshold promotion
-				decimal total = subtotal + tax + shipping;
+                // 3. Open database transaction boundary across our Docker SQL instance
+                using var transaction = await _context.Database.BeginTransactionAsync();
 
-				// 5. Generate a unique, recognizable invoice token tracking format
-				string customOrderNumber = $"APEX-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
+                try
+                {
+                    string customOrderNumber = $"APEX-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
 
-				// 6. Build and stage the parent Order model instance
-				var order = new Order
-				{
-					OrderNumber = customOrderNumber,
-					CustomerEmail = request.CustomerEmail,
-					Subtotal = subtotal,
-					Tax = tax,
-					Shipping = shipping,
-					Total = total,
-					OrderStatus = "Pending",
-					CreatedUtc = DateTime.UtcNow,
-					OrderItems = lineItemsToPersist
-				};
+                    // Build and stage the parent Order record
+                    var order = new Order
+                    {
+                        OrderNumber = customOrderNumber,
+                        CustomerEmail = request.CustomerEmail,
+                        Subtotal = subtotal,
+                        Tax = tax,
+                        Shipping = shipping,
+                        Total = total,
+                        OrderStatus = "Pending",
+                        CreatedUtc = DateTime.UtcNow,
+                        OrderItems = lineItemsToPersist
+                    };
 
-				// 7. Persist context data blocks right to SQL Server inside Docker container memory
-				_context.Orders.Add(order);
-				await _context.SaveChangesAsync();
+                    _context.Orders.Add(order);
+                    await _context.SaveChangesAsync();
 
-				// Commit the execution loop safely
-				await transaction.CommitAsync();
+                    // Safely commit database changes upon banking confirmation
+                    await transaction.CommitAsync();
 
-				return Ok(new
-				{
-					success = true,
-					message = "Transaction authorized and logged securely.",
-					orderNumber = order.OrderNumber,
-					totalCharged = order.Total
-				});
-			}
-			catch (Exception ex)
-			{
-				// Roll back database changes if the connection dropped or validation timed out
-				await transaction.RollbackAsync();
-				return StatusCode(500, new { error = "Internal transactional processing error occurred.", details = ex.Message });
-			}
-		}
-	}
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Transaction authorized and logged securely.",
+                        orderNumber = order.OrderNumber,
+                        totalCharged = order.Total,
+                        transactionReference = paymentResult.TransactionReference
+                    });
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw; // Re-throw to hit our main controller fallback trap
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Internal transactional processing error occurred.", details = ex.Message });
+            }
+        }
+    }
 }
