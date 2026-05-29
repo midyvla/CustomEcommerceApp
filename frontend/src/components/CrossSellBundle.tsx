@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useBundle } from '../hooks/useBundle';
+import type { CartItem } from '../context/CartContext';
 
 interface CrossSellBundleProps {
   productId: number;
 }
 
 export const CrossSellBundle: React.FC<CrossSellBundleProps> = ({ productId }) => {
+
+
   // 1. Fetch real-time SQL data across our network bridge
   const { data: product, loading, error } = useBundle(productId);
 
@@ -127,9 +130,37 @@ export const CrossSellBundle: React.FC<CrossSellBundleProps> = ({ productId }) =
             <span className="text-sm font-medium text-gray-500">Total Bundle Cost:</span>
             <span className="text-3xl font-black text-gray-900 tracking-tight">${totalPrice.toFixed(2)}</span>
           </div>
-          <button className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:shadow-lg transition-all transform active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-            Claim This Bundle Offer
-          </button>
+                  <button
+                      onClick={() => {
+                          if (!product) return;
+
+                          // 1. Package the parent product shape configuration
+                          const itemsToBag: CartItem[] = [{
+                              id: product.productId,
+                              name: product.name,
+                              price: product.basePrice,
+                              isAddon: false
+                          }];
+
+                          // 2. Append any active checked auxiliary cross-sells
+                          product.crossSells.forEach(addon => {
+                              if (selectedAddons.includes(addon.productId)) {
+                                  itemsToBag.push({
+                                      id: addon.productId,
+                                      name: addon.name,
+                                      price: addon.bundlePrice,
+                                      isAddon: true
+                                  });
+                              }
+                          });
+
+                          // 3. Commit packages to global context memory
+                          addToCart(itemsToBag);
+                      }}
+                      className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:shadow-lg transition-all transform active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                      Claim This Bundle Offer
+                  </button>
         </div>
 
       </div>
