@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "n+r3YT+GbXA=",
+  "dgSpecHash": "nxH9zFrRTSI=",
   "success": true,
-  "projectFilePath": "C:\\source\\repos\\customecommerceapp\\backend\\Apexcommerce.Api\\ApexCommerce.Api.csproj",
+  "projectFilePath": "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\ApexCommerce.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\midyv\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.8\\microsoft.aspnetcore.openapi.10.0.8.nupkg.sha512",
     "C:\\Users\\midyv\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512",

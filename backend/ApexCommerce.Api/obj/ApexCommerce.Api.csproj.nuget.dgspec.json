@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\source\\repos\\customecommerceapp\\backend\\Apexcommerce.Api\\ApexCommerce.Api.csproj": {}
+    "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\ApexCommerce.Api.csproj": {}
   },
   "projects": {
-    "C:\\source\\repos\\customecommerceapp\\backend\\Apexcommerce.Api\\ApexCommerce.Api.csproj": {
+    "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\ApexCommerce.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\source\\repos\\customecommerceapp\\backend\\Apexcommerce.Api\\ApexCommerce.Api.csproj",
+        "projectUniqueName": "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\ApexCommerce.Api.csproj",
         "projectName": "ApexCommerce.Api",
-        "projectPath": "C:\\source\\repos\\customecommerceapp\\backend\\Apexcommerce.Api\\ApexCommerce.Api.csproj",
+        "projectPath": "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\ApexCommerce.Api.csproj",
         "packagesPath": "C:\\Users\\midyv\\.nuget\\packages\\",
-        "outputPath": "C:\\source\\repos\\customecommerceapp\\backend\\Apexcommerce.Api\\obj\\",
+        "outputPath": "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
