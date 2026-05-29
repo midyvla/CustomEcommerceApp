@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\ApexCommerce.Api.csproj": {}
+    "C:\\Source\\Repos\\CustomEcommerceApp\\backend\\ApexCommerce.Api\\ApexCommerce.Api.csproj": {}
   },
   "projects": {
-    "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\ApexCommerce.Api.csproj": {
+    "C:\\Source\\Repos\\CustomEcommerceApp\\backend\\ApexCommerce.Api\\ApexCommerce.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\ApexCommerce.Api.csproj",
+        "projectUniqueName": "C:\\Source\\Repos\\CustomEcommerceApp\\backend\\ApexCommerce.Api\\ApexCommerce.Api.csproj",
         "projectName": "ApexCommerce.Api",
-        "projectPath": "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\ApexCommerce.Api.csproj",
+        "projectPath": "C:\\Source\\Repos\\CustomEcommerceApp\\backend\\ApexCommerce.Api\\ApexCommerce.Api.csproj",
         "packagesPath": "C:\\Users\\midyv\\.nuget\\packages\\",
-        "outputPath": "C:\\source\\repos\\customecommerceapp\\backend\\apexcommerce.api\\obj\\",
+        "outputPath": "C:\\Source\\Repos\\CustomEcommerceApp\\backend\\ApexCommerce.Api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -55,6 +55,18 @@
             "Microsoft.AspNetCore.OpenApi": {
               "target": "Package",
               "version": "[10.0.8, )"
+            },
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[10.0.8, )"
+            },
+            "Microsoft.EntityFrameworkCore.Relational": {
+              "target": "Package",
+              "version": "[10.0.0-*, )"
+            },
+            "Microsoft.EntityFrameworkCore.SqlServer": {
+              "target": "Package",
+              "version": "[10.0.0-*, )"
             },
             "System.Data.SqlClient": {
               "target": "Package",
