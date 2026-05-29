@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ApexCommerce.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4b55ecd8da7f5023917ae4835d8e5e09abb1debf")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+12c78076ed0f073fc6295478fbe92850f4724547")]
 [assembly: System.Reflection.AssemblyProductAttribute("ApexCommerce.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ApexCommerce.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
