@@ -1,5 +1,5 @@
+import type { ProductDetail } from '../types/bundle'; // Ensure the path accurately navigates to src/types/bundle.ts
 import { useState, useEffect } from 'react';
-import { ProductDetail } from '../types/bundle';
 
 export const useBundle = (productId: number) => {
   const [data, setData] = useState<ProductDetail | null>(null);
