@@ -1,0 +1,18 @@
+# Visual Studio Internal Cache & Settings Tools
+.vs/
+*.suo
+*.user
+*.slnx
+*.sqlite
+
+# Compiled Artifact Binaries (Never commit these!)
+**/bin/
+**/obj/
+
+# Node Modules and Client Build Outputs
+**/node_modules/
+**/dist/
+
+# Local Environment Variables Secrets
+.env
+.env.local

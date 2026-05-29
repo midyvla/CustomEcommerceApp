@@ -26,27 +26,98 @@ export const AdminDashboard: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
-    // --- NEW INTERACTIVE FILTER STATE ENGINE ---
+    // Filter tool states
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [statusFilter, setStatusFilter] = useState<string>('All');
 
+    // Local operation tracking flag
+    const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+    const fetchOrders = async () => {
+        try {
+            const response = await fetch('http://localhost:5201/api/orders');
+            if (!response.ok) throw new Error('Failed to retrieve system order logs.');
+            const data = await response.json();
+            setOrders(data);
+        } catch (err: any) {
+            setError(err.message || 'Network connectivity fault.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchOrders = async () => {
-            try {
-                const response = await fetch('http://localhost:5201/api/orders');
-                if (!response.ok) throw new Error('Failed to retrieve system order logs.');
-                const data = await response.json();
-                setOrders(data);
-            } catch (err: any) {
-                setError(err.message || 'Network connectivity fault.');
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchOrders();
     }, []);
 
-    // --- RUN REAL-TIME STATE FILTERING RULES ---
+    // --- ASYNCHRONOUS BACKEND PUT ACTION DISPATCHER ---
+    const handleStatusChange = async (orderId: number, newStatus: string) => {
+        setUpdatingId(orderId);
+        try {
+            const response = await fetch(`http://localhost:5201/api/orders/${orderId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (!response.ok) {
+                const errorResult = await response.json();
+                throw new Error(errorResult.error || 'Failed to update transaction state.');
+            }
+
+            // Optimistically swap the state locally to avoid a full pipeline re-query pause
+            setOrders(prevOrders =>
+                prevOrders.map(o => o.orderId === orderId ? { ...o, orderStatus: newStatus } : o)
+            );
+        } catch (err: any) {
+            alert(`Operation Fault: ${err.message}`);
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
+    // --- CLIENT-SIDE SPREADSHEET EXPORT WORKER ENGINE ---
+    const handleExportToCSV = () => {
+        if (filteredOrders.length === 0) return;
+
+        // 1. Establish structural column headers mapping layout
+        const headers = ["Invoice Number", "Date Settled UTC", "Customer Email", "Purchased Items Manifest", "Subtotal ($)", "Tax ($)", "Shipping ($)", "Total Revenue ($)", "Lifecycle Status"];
+
+        // 2. Map data rows while stripping out inner layout comma breakers to safeguard alignment bounds
+        const csvRows = filteredOrders.map(order => {
+            const itemsDescription = order.orderItems
+                .map(i => `${i.quantity}x ${i.productName}${i.isAddon ? ' (Addon)' : ''}`)
+                .join(' | ');
+
+            return [
+                `"${order.orderNumber}"`,
+                `"${new Date(order.createdUtc).toISOString()}"`,
+                `"${order.customerEmail}"`,
+                `"${itemsDescription.replace(/"/g, '""')}"`, // Double quotes protect string spaces escape bounds
+                order.subtotal.toFixed(2),
+                order.tax.toFixed(2),
+                order.shipping.toFixed(2),
+                order.total.toFixed(2),
+                `"${order.orderStatus}"`
+            ].join(',');
+        });
+
+        // 3. Combine header schemas with dataset components
+        const csvContent = [headers.join(','), ...csvRows].join('\n');
+
+        // 4. Instantiate a virtual download link profile to fire the system resource stream
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `APEX_Ledger_Export_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // Real-time local evaluation query paths
     const filteredOrders = orders.filter((order) => {
         const matchesSearch =
             order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -58,7 +129,6 @@ export const AdminDashboard: React.FC = () => {
         return matchesSearch && matchesStatus;
     });
 
-    // Compute aggregate operational analytics based strictly on currently filtered items
     const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.total, 0);
     const averageOrderValue = filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0;
 
@@ -74,9 +144,18 @@ export const AdminDashboard: React.FC = () => {
                     <h1 className="text-2xl font-black text-gray-900 tracking-tight">Admin Operations Ledger</h1>
                     <p className="text-xs text-gray-500 mt-1">Real-time analytical performance tracking directly from Docker SQL Server core.</p>
                 </div>
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full">
-                    Live Sync Active
-                </span>
+
+                {/* --- DYNAMIC GRAPHICAL SPREADSHEET DOWNLOAD TRIGGER BUTTON --- */}
+                <button
+                    onClick={handleExportToCSV}
+                    disabled={filteredOrders.length === 0}
+                    className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold text-xs px-4 py-2.5 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer select-none"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    <span>Export Filtered Sheets (.CSV)</span>
+                </button>
             </div>
 
             {/* Aggregate Analytical Performance Cards */}
@@ -95,7 +174,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* --- NEW CONTROL FILTER TOOLBAR ROW --- */}
+            {/* Control Filter Toolbar Row */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-4 border border-gray-100 rounded-xl shadow-sm/30">
                 <div className="sm:col-span-2">
                     <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1.5">Search Order Records</label>
@@ -132,14 +211,14 @@ export const AdminDashboard: React.FC = () => {
                                 <th className="p-4">Customer Email</th>
                                 <th className="p-4">Items Manifest</th>
                                 <th className="p-4 text-right">Financial Breakdown</th>
-                                <th className="p-4 text-center">Status</th>
+                                <th className="p-4 text-center">Interactive Lifecycle Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 text-sm">
                             {filteredOrders.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="p-12 text-center text-gray-400 font-medium">
-                                        🔍 No orders found matching "{searchQuery}" under "{statusFilter}" filters.
+                                        🔍 No orders found matching specified criteria.
                                     </td>
                                 </tr>
                             ) : (
@@ -173,14 +252,30 @@ export const AdminDashboard: React.FC = () => {
                                                 Sub: ${order.subtotal.toFixed(2)} | Tax: ${order.tax.toFixed(2)}
                                             </p>
                                         </td>
+
+                                        {/* --- NEW INTERACTIVE DROPDOWN LIFE-CYCLE CONTROLLER ROW --- */}
                                         <td className="p-4 text-center whitespace-nowrap">
-                                            <span className={`text-[10px] uppercase font-extrabold tracking-wider border px-2.5 py-1 rounded-md ${order.orderStatus === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                                    order.orderStatus === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                                                        'bg-amber-50 text-amber-700 border-amber-100'
-                                                }`}>
-                                                {order.orderStatus}
-                                            </span>
+                                            <div className="inline-block relative">
+                                                <select
+                                                    value={order.orderStatus}
+                                                    disabled={updatingId === order.orderId}
+                                                    onChange={(e) => handleStatusChange(order.orderId, e.target.value)}
+                                                    className={`text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border focus:outline-none cursor-pointer transition-all appearance-none pr-7 ${order.orderStatus === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-200' :
+                                                            order.orderStatus === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-200' :
+                                                                'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-200'
+                                                        }`}
+                                                >
+                                                    <option value="Pending">Pending</option>
+                                                    <option value="Shipped">Shipped</option>
+                                                    <option value="Completed">Completed</option>
+                                                </select>
+                                                {/* Custom minimal indicator arrow down chevron */}
+                                                <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-400 text-[8px]">
+                                                    ▼
+                                                </div>
+                                            </div>
                                         </td>
+
                                     </tr>
                                 ))
                             )}

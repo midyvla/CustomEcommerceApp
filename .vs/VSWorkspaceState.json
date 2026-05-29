@@ -1,10 +1,10 @@
 {
   "ExpandedNodes": [
     "",
+    "\\frontend",
     "\\frontend\\src",
-    "\\frontend\\src\\components",
-    "\\frontend\\src\\hooks"
+    "\\frontend\\src\\components"
   ],
-  "SelectedNode": "\\DOCS_LOG.md",
+  "SelectedNode": "\\frontend\\src\\components\\CrossSellBundle.tsx",
   "PreviewInSolutionExplorer": false
 }

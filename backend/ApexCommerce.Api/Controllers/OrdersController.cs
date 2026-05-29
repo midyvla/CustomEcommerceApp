@@ -28,5 +28,42 @@ namespace ApexCommerce.Api.Controllers
 
             return Ok(orders);
         }
+
+        // PUT: api/orders/5/status
+        [HttpPut("{id}/status")]
+        public async Task<IActionResult> UpdateOrderStatus(int id, [FromBody] StatusUpdateDto dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Status))
+            {
+                return BadRequest(new { error = "An explicit lifecycle status state must be provided." });
+            }
+
+            // Validate that the requested status conforms to system boundaries
+            var validStatuses = new[] { "Pending", "Shipped", "Completed" };
+            if (!validStatuses.Contains(dto.Status))
+            {
+                return BadRequest(new { error = $"Status value '{dto.Status}' is invalid." });
+            }
+
+            var order = await _context.Orders.FindAsync(id);
+            if (order == null)
+            {
+                return NotFound(new { error = $"Order ID {id} does not exist inside system logs." });
+            }
+
+            // Apply the update
+            order.OrderStatus = dto.Status;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true, message = $"Order status advanced to '{dto.Status}' successfully." });
+        }
+
+        // Inline request body helper definition contract
+        public class StatusUpdateDto
+        {
+            public string Status { get; set; } = string.Empty;
+        }
+
+
     }
 }
