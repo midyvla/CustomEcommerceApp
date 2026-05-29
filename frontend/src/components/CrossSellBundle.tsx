@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBundle } from '../hooks/useBundle';
+import { useCart } from '../context/CartContext';
 import type { CartItem } from '../context/CartContext';
 
 interface CrossSellBundleProps {
@@ -7,7 +8,7 @@ interface CrossSellBundleProps {
 }
 
 export const CrossSellBundle: React.FC<CrossSellBundleProps> = ({ productId }) => {
-
+  const { addToCart } = useCart();
 
   // 1. Fetch real-time SQL data across our network bridge
   const { data: product, loading, error } = useBundle(productId);
