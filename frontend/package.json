@@ -12,7 +12,8 @@
   "dependencies": {
     "@tinymce/tinymce-react": "^6.3.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "tinymce": "^8.5.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

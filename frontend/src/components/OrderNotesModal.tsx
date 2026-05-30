@@ -135,12 +135,13 @@ export const OrderNotesModal: React.FC<OrderNotesModalProps> = ({ orderId, order
                     )}
                 </div>
 
-                {/* --- UPGRADED MANAGED RICH TEXT CREATOR DOCK --- */}
+                {/* --- UPGRADED SELF-HOSTED RICH TEXT CREATOR DOCK --- */}
                 <div className="p-4 border-t border-gray-100 bg-white rounded-b-xl space-y-3">
                     <Editor
-                        apiKey="your-tinymce-cloud-api-key" // Leave blank or inject key string if hosting out of cloud portals
+                        tinymceScriptSrc="/tinymce/tinymce.min.js"
                         value={noteText}
                         init={{
+                            license_key: 'gpl',
                             height: 180,
                             menubar: false,
                             plugins: [
@@ -149,10 +150,17 @@ export const OrderNotesModal: React.FC<OrderNotesModalProps> = ({ orderId, order
                                 'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
                             ],
                             toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist | link image media | removeformat | help',
-                            content_style: 'body { font-family:Inter,Helvetica,Arial,sans-serif; font-size:12px }',
+
+                            // ⚡ ENFORCED LOCAL BASE MAPPINGS
+                            base_url: '/tinymce',
+                            suffix: '.min',
                             skin: 'oxide',
-                            promotion: false,
-                            branding: false,
+                            theme: 'silver', // Explicitly declare the layout theme engine
+                            model: 'dom',    // Explicitly anchor the document model mapper
+
+                            content_style: 'body { font-family:Inter,Helvetica,Arial,sans-serif; font-size:12px }',
+                            promotion: false, // Disables the "Upgrade" link banner
+                            branding: false,  // Disables the TinyMCE watermark footprint
                         }}
                         onEditorChange={(newHtmlContent) => {
                             setNoteText(newHtmlContent);
