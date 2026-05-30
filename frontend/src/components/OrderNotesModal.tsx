@@ -17,7 +17,7 @@ interface OrderNotesModalProps {
     onClose: () => void;
 }
 
-public const OrderNotesModal: React.FC<OrderNotesModalProps> = ({ orderId, orderNumber, onClose }) => {
+export const OrderNotesModal: React.FC<OrderNotesModalProps> = ({ orderId, orderNumber, onClose }) => {
     const [notes, setNotes] = useState<OrderNote[]>([]);
     const [loading, setLoading] = useState(true);
 
