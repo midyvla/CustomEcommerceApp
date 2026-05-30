@@ -5,6 +5,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddScoped<IPaymentGatewayService, MockPaymentGatewayService>();
 
+// Inject the notification dispatcher service
+builder.Services.AddSingleton<IEmailService, MockEmailService>();
+
 // 1. Configure Services (Dependency Injection Container)
 builder.Services.AddCors(options =>
 {

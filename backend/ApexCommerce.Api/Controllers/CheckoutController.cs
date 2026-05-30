@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ApexCommerce.Api.Data;
 using ApexCommerce.Api.Models;
 using ApexCommerce.Api.DTOs;
-using ApexCommerce.Api.Services; // Ensure your services namespace is included
+using ApexCommerce.Api.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,25 +17,22 @@ namespace ApexCommerce.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IPaymentGatewayService _paymentService;
+        private readonly IEmailService _emailService;
 
-        // One single unified constructor injecting both infrastructure dependencies
-        public CheckoutController(AppDbContext context, IPaymentGatewayService paymentService)
+        public CheckoutController(AppDbContext context, IPaymentGatewayService paymentService, IEmailService emailService)
         {
             _context = context;
             _paymentService = paymentService;
+            _emailService = emailService;
         }
 
         [HttpPost]
         public async Task<IActionResult> ProcessCheckout([FromBody] CheckoutRequestDto request)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
             try
             {
-                // 1. Calculate base items pricing layout dynamically first to establish our financial totals
                 decimal basePrice = 49.99m;
                 var lineItemsToPersist = new List<OrderItem>();
 
@@ -50,7 +47,6 @@ namespace ApexCommerce.Api.Controllers
 
                 decimal subtotal = basePrice;
 
-                // Process companion bundle addons if checked
                 if (request.SelectedAddonProductIds != null && request.SelectedAddonProductIds.Any())
                 {
                     foreach (var addonId in request.SelectedAddonProductIds)
@@ -60,7 +56,7 @@ namespace ApexCommerce.Api.Controllers
 
                         if (addonId == 2) { addonPrice = 19.99m; addonName = "Organic Rosemary & Biotin Growth Serum"; }
                         else if (addonId == 3) { addonPrice = 16.14m; addonName = "Premium Jojoba Detoxifying Scalp Oil"; }
-                        else { return BadRequest(new { error = $"Requested addon item ID {addonId} is invalid or out of stock." }); }
+                        else { return BadRequest(new { error = $"Addon ID {addonId} invalid." }); }
 
                         subtotal += addonPrice;
                         lineItemsToPersist.Add(new OrderItem
@@ -74,27 +70,21 @@ namespace ApexCommerce.Api.Controllers
                     }
                 }
 
-                // Calculate total pricing baseline metrics
-                decimal tax = Math.Round(subtotal * 0.0625m, 2); // 6.25% Massachusetts rate
+                decimal tax = Math.Round(subtotal * 0.0625m, 2);
                 decimal shipping = subtotal >= 75.00m ? 0.00m : 5.99m;
                 decimal total = subtotal + tax + shipping;
 
-                // 2. DISPATCH PAYMENT GATEWAY AUTH LOOP
-                // We run this BEFORE creating database records to protect stock tables from failed payments
+                // 1. Process Bank Card Authorization
                 var paymentResult = await _paymentService.ProcessAuthorizationAsync(request.CustomerEmail, total);
-                if (!paymentResult.IsSuccess)
-                {
-                    return BadRequest(new { error = paymentResult.ErrorMessage });
-                }
+                if (!paymentResult.IsSuccess) return BadRequest(new { error = paymentResult.ErrorMessage });
 
-                // 3. Open database transaction boundary across our Docker SQL instance
+                // 2. Commit safely within our Docker atomic execution transaction loop
                 using var transaction = await _context.Database.BeginTransactionAsync();
 
                 try
                 {
                     string customOrderNumber = $"APEX-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
 
-                    // Build and stage the parent Order record
                     var order = new Order
                     {
                         OrderNumber = customOrderNumber,
@@ -110,28 +100,44 @@ namespace ApexCommerce.Api.Controllers
 
                     _context.Orders.Add(order);
                     await _context.SaveChangesAsync();
-
-                    // Safely commit database changes upon banking confirmation
                     await transaction.CommitAsync();
+
+                    // 3. BACKGROUND NOTIFICATION DISPATCH FIRE-AND-FORGET LOOPS
+                    // Fire automated milestones updates without blocking user confirmation speeds
+                    _ = _emailService.SendOrderPlacedEmailAsync(order.CustomerEmail, order.OrderNumber, order.Total);
+                    _ = _emailService.SendPaymentSettledEmailAsync(order.CustomerEmail, order.OrderNumber, paymentResult.TransactionReference);
+
+
+                    
+                    var systemLogNote = new OrderNote
+                    {
+                        OrderId = order.OrderId,
+                        OrderNumber = order.OrderNumber,
+                        ContentHtml = $"<p><strong>Automated Mail Triggered Successfully:</strong> Customer notification invoice dispatched tracking receipt reference {order.OrderNumber} total amount settled ${order.Total}.</p>",
+                        CreatedByAdmin = "SYSTEM_AUTOMATION",
+                        CreatedUtc = DateTime.UtcNow,
+                        IsSystemLog = true
+                    };
+                    _context.OrderNotes.Add(systemLogNote);
+                    await _context.SaveChangesAsync();
+
 
                     return Ok(new
                     {
                         success = true,
-                        message = "Transaction authorized and logged securely.",
                         orderNumber = order.OrderNumber,
-                        totalCharged = order.Total,
-                        transactionReference = paymentResult.TransactionReference
+                        totalCharged = order.Total
                     });
                 }
                 catch (Exception)
                 {
                     await transaction.RollbackAsync();
-                    throw; // Re-throw to hit our main controller fallback trap
+                    throw;
                 }
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Internal transactional processing error occurred.", details = ex.Message });
+                return StatusCode(500, new { error = "Internal error.", details = ex.Message });
             }
         }
     }

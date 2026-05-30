@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ApexCommerce.Api.Data;
+using ApexCommerce.Api.Models;
+using ApexCommerce.Api.Services;
+using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace ApexCommerce.Api.Controllers
@@ -10,68 +14,57 @@ namespace ApexCommerce.Api.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IEmailService _emailService;
 
-        public OrdersController(AppDbContext context)
+        public OrdersController(AppDbContext context, IEmailService emailService)
         {
             _context = context;
+            _emailService = emailService;
         }
 
-        // GET: api/orders
         [HttpGet]
         public async Task<IActionResult> GetAllOrders()
         {
-            // Eagerly load (.Include) child OrderItems to prevent N+1 query execution penalties
-            var orders = await _context.Orders
-                .Include(o => o.OrderItems)
-                .OrderByDescending(o => o.CreatedUtc)
-                .ToListAsync();
-
+            var orders = await _context.Orders.Include(o => o.OrderItems).OrderByDescending(o => o.CreatedUtc).ToListAsync();
             return Ok(orders);
         }
 
-        // PUT: api/orders/5/status
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateOrderStatus(int id, [FromBody] StatusUpdateDto dto)
         {
-            if (dto == null || string.IsNullOrWhiteSpace(dto.Status))
-                return BadRequest(new { error = "An explicit lifecycle status state must be provided." });
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Status)) return BadRequest(new { error = "Status required." });
 
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
-                return NotFound(new { error = $"Order ID {id} does not exist inside system logs." });
+            var order = await _context.Orders.Include(o => o.OrderItems).FirstOrDefaultAsync(o => o.OrderId == id);
+            if (order == null) return NotFound(new { error = "Order missing." });
 
-            // --- STRATEGIC BUSINESS WORKFLOW TRANSITION RULES ---
             string current = order.OrderStatus;
             string target = dto.Status;
 
-            if (current == target) return Ok(new { success = true, message = "Status remains unchanged." });
+            if (current == target) return Ok(new { success = true, message = "No change." });
 
-            // Prevent bypassing business steps or illegal backwards state degradation updates
             bool isValidTransition = (current == "Pending" && target == "Shipped") ||
                                      (current == "Shipped" && target == "Completed") ||
-                                     (current == "Pending" && target == "Completed"); // Express bypass route Allowed
+                                     (current == "Pending" && target == "Completed");
 
-            if (!isValidTransition)
-            {
-                return BadRequest(new
-                {
-                    error = $"Invalid workflow transition. Cannot move order status directly from '{current}' to '{target}'."
-                });
-            }
+            if (!isValidTransition) return BadRequest(new { error = "Invalid workflow progression direction." });
 
-            // Apply the verified status modification safely
             order.OrderStatus = target;
             await _context.SaveChangesAsync();
 
-            return Ok(new { success = true, message = $"Order updated from '{current}' to '{target}'." });
+            // ⚡ AUTOMATED MILESTONE DISPATCH TRANSITION GATE
+            // Automatically fire shipping notices with tracking numbers when flipped to Shipped
+            if (target == "Shipped")
+            {
+                string trackingNumber = $"APX-{Guid.NewGuid().ToString()[..8].ToUpper()}-USPS";
+                _ = _emailService.SendOrderShippedEmailAsync(order.CustomerEmail, order.OrderNumber, trackingNumber);
+            }
+
+            return Ok(new { success = true, message = $"Order status advanced to '{target}'." });
         }
+    }
 
-        // Inline request body helper definition contract
-        public class StatusUpdateDto
-        {
-            public string Status { get; set; } = string.Empty;
-        }
-
-
+    public class StatusUpdateDto
+    {
+        public string Status { get; set; } = string.Empty;
     }
 }
