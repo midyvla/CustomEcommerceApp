@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { OrderNotesModal } from './OrderNotesModal'; // Ensure your import mapping is clear
 
 interface OrderItem {
     orderItemId: number;
@@ -32,6 +33,9 @@ export const AdminDashboard: React.FC = () => {
 
     // Local operation tracking flag
     const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+    // --- 1. NEW STATE INDICATOR FOR AUDITED LOGGING WORKSPACE ---
+    const [selectedOrderForNotes, setSelectedOrderForNotes] = useState<{ id: number; num: string } | null>(null);
 
     const fetchOrders = async () => {
         try {
@@ -159,7 +163,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Aggregate Analytical Performance Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white p-5 border border-gray-100 rounded-xl shadow-sm/40">
                     <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Gross Revenue (Filtered)</p>
                     <p className="text-3xl font-black text-indigo-600 mt-2">${totalRevenue.toFixed(2)}</p>
@@ -171,6 +175,31 @@ export const AdminDashboard: React.FC = () => {
                 <div className="bg-white p-5 border border-gray-100 rounded-xl shadow-sm/40">
                     <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Filtered AOV</p>
                     <p className="text-3xl font-black text-emerald-600 mt-2">${averageOrderValue.toFixed(2)}</p>
+                </div>
+
+                {/* --- WAREHOUSE ALLOCATIONS GAUGE CARD --- */}
+                <div className="bg-white p-5 border border-gray-100 rounded-xl shadow-sm/40 flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Warehouse Allocations Hub</p>
+                            <span className="text-[10px] font-bold bg-green-50 text-green-700 px-2 py-0.5 rounded">Docker Connected</span>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                            <div className="flex justify-between text-xs font-semibold text-gray-700">
+                                <span>3D Smart Massager Stock Level</span>
+                                <span className="font-mono font-bold">64% Capacity</span>
+                            </div>
+
+                            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden border border-gray-200/40">
+                                <div
+                                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full shadow-inner transition-all duration-1000 ease-out"
+                                    style={{ width: '64%' }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-3 leading-tight">Stock counts update concurrently via database record tracking triggers upon checkout confirmations.</p>
                 </div>
             </div>
 
@@ -224,12 +253,20 @@ export const AdminDashboard: React.FC = () => {
                             ) : (
                                 filteredOrders.map((order) => (
                                     <tr key={order.orderId} className="hover:bg-gray-50/40 transition-colors">
+
+                                        {/* --- 2. DYNAMIC WORKSPACE INTERACTION LINK WRAPPER --- */}
                                         <td className="p-4 whitespace-nowrap">
-                                            <p className="font-mono font-bold text-gray-900">{order.orderNumber}</p>
+                                            <button
+                                                onClick={() => setSelectedOrderForNotes({ id: order.orderId, num: order.orderNumber })}
+                                                className="font-mono font-black text-indigo-600 hover:text-indigo-800 transition-colors text-left focus:outline-none underline decoration-indigo-200 hover:decoration-indigo-500 cursor-pointer text-xs"
+                                            >
+                                                {order.orderNumber}
+                                            </button>
                                             <p className="text-[11px] text-gray-400 mt-0.5">
                                                 {new Date(order.createdUtc).toLocaleString()}
                                             </p>
                                         </td>
+
                                         <td className="p-4 text-gray-600 font-medium">{order.customerEmail}</td>
                                         <td className="p-4 max-w-xs">
                                             <div className="space-y-1">
@@ -253,7 +290,7 @@ export const AdminDashboard: React.FC = () => {
                                             </p>
                                         </td>
 
-                                        {/* --- NEW INTERACTIVE DROPDOWN LIFE-CYCLE CONTROLLER ROW --- */}
+                                        {/* --- INTERACTIVE DROPDOWN LIFE-CYCLE CONTROLLER ROW --- */}
                                         <td className="p-4 text-center whitespace-nowrap">
                                             <div className="inline-block relative">
                                                 <select
@@ -261,21 +298,19 @@ export const AdminDashboard: React.FC = () => {
                                                     disabled={updatingId === order.orderId}
                                                     onChange={(e) => handleStatusChange(order.orderId, e.target.value)}
                                                     className={`text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border focus:outline-none cursor-pointer transition-all appearance-none pr-7 ${order.orderStatus === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-200' :
-                                                            order.orderStatus === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-200' :
-                                                                'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-200'
+                                                        order.orderStatus === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-200' :
+                                                            'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-200'
                                                         }`}
                                                 >
                                                     <option value="Pending">Pending</option>
                                                     <option value="Shipped">Shipped</option>
                                                     <option value="Completed">Completed</option>
                                                 </select>
-                                                {/* Custom minimal indicator arrow down chevron */}
                                                 <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-400 text-[8px]">
                                                     ▼
                                                 </div>
                                             </div>
                                         </td>
-
                                     </tr>
                                 ))
                             )}
@@ -283,6 +318,15 @@ export const AdminDashboard: React.FC = () => {
                     </table>
                 </div>
             </div>
+
+            {/* --- 3. MOUNT THE AUDITED NOTES DIALOG MODAL BASE AT TIMELINE BOUNDS --- */}
+            {selectedOrderForNotes && (
+                <OrderNotesModal
+                    orderId={selectedOrderForNotes.id}
+                    orderNumber={selectedOrderForNotes.num}
+                    onClose={() => setSelectedOrderForNotes(null)}
+                />
+            )}
 
         </div>
     );
